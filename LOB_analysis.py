@@ -174,7 +174,8 @@ def calculate_pvt(interval_data):
     pvt = (((interval_data.close - interval_data.close.shift(1)) / interval_data.close.shift(1)) * interval_data.vol).cumsum().rename('pvt')
     return pvt
 
-
+# This function adds 24 columns
+# It can be improved by not spanning across days, i.e. 9:30am data should utilise previous days interval features
 def get_interval_features(interval_data):
     interval_data = interval_data.merge(calc_momentum(interval_data), left_index=True, right_index=True)
     interval_data = interval_data.merge(calc_williams_pct_r(interval_data), left_index=True, right_index=True)
@@ -201,6 +202,22 @@ def get_interval_features(interval_data):
     
     return interval_data
 
+
+def standardize_previous(interval_data, standardize_offset = 1):
+    tmp = interval_data.reset_index()
+    year_day = tmp.set_index([tmp.time.dt.year, tmp.time.dt.dayofyear - standardize_offset]) # -1 to normalize by previous day
+    groupby = tmp.groupby([tmp.time.dt.year, tmp.time.dt.dayofyear])
+
+    mean = groupby.mean()
+    year_day_mean = mean[mean.index.isin(year_day.index)]
+
+    std = groupby.std()
+    year_day_std = std[std.index.isin(year_day.index)]
+
+    standardized = ((year_day - year_day_mean) / year_day_std)
+    standardized = standardized.reset_index(drop=True)
+    standardized.loc[:, 'time'] = tmp.time
+    return standardized.set_index('time')
 
 """
 Assumes that all the data provided occurs after the market open.
@@ -232,11 +249,12 @@ def get_time_features(interval_data):
     return interval_data.set_index(idx)
 
 
-def generate_data(message, orderbook, granularity = '10s'):
+def generate_data(message, orderbook, granularity = '10s', standardize_offset = 1):
     base_data = get_base_features(message, orderbook)
     interval_insight_data = get_interval_insight_features(base_data, granularity = granularity)
     interval_data = get_interval_features(interval_insight_data)
-    data = get_time_features(interval_data)
+    standardized_interval_data = standardize_previous(interval_data, standardize_offset)
+    data = get_time_features(standardized_interval_data)
     return data
 
 
