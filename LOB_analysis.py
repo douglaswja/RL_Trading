@@ -202,10 +202,11 @@ def get_interval_features(interval_data):
     
     return interval_data
 
-
 def standardize_previous(interval_data, standardize_offset = 1):
+    raw_bid_ask = interval_data.loc[:, ['bid', 'ask']]
+    
     tmp = interval_data.reset_index()
-    year_day = tmp.set_index([tmp.time.dt.year, tmp.time.dt.dayofyear - standardize_offset]) # -1 to normalize by previous day
+    year_day = tmp.set_index([tmp.time.dt.year, tmp.time.dt.dayofyear - 1]) # -1 to normalize by previous day
     groupby = tmp.groupby([tmp.time.dt.year, tmp.time.dt.dayofyear])
 
     mean = groupby.mean()
@@ -217,7 +218,10 @@ def standardize_previous(interval_data, standardize_offset = 1):
     standardized = ((year_day - year_day_mean) / year_day_std)
     standardized = standardized.reset_index(drop=True)
     standardized.loc[:, 'time'] = tmp.time
-    return standardized.set_index('time')
+
+    standardized = standardized.set_index('time')
+    standardized = standardized.rename({'bid': 'bid_standardized', 'ask': 'ask_standardized'}, axis=1)
+    return pd.merge(raw_bid_ask, standardized, left_index=True, right_index=True)
 
 """
 Assumes that all the data provided occurs after the market open.
@@ -290,13 +294,15 @@ def is_same_day(array):
         raise TypeError(f"Function is_same_day was called on array of class {series.dtype.__class__} instead of {np.dtype('datetime64').__class__}")
     return (series.dt.day == series.dt.day.iloc[0]).all()
 
-def generate_time_series_samples(data, labels, sample_size):
+def generate_time_series_samples(data, labels, bids, asks, sample_size):
     # Verify index of time column
     # Labels, bid, ask (with time)
-    na_idx = data.isna().any(axis=1) | labels.isna()
+    na_idx = data.isna().any(axis=1) | labels.isna() | bids.isna() | asks.isna()
     
     data = data[~na_idx].reset_index()  # Data has time as its index, use it as a column
     labels = labels[~na_idx]
+    bids = bids[~na_idx]
+    asks = asks[~na_idx]
     
     # Save original info for later reuse
     columns = data.columns
@@ -304,13 +310,17 @@ def generate_time_series_samples(data, labels, sample_size):
     
     samples = sliding_window_view(data, sample_size, axis=0).transpose((0, 2, 1))  # Outputs: (Batch, Observation, Column)
     sample_labels = labels.iloc[ (sample_size-1) : ]                               # Labels corresponding to `samples`
+    sample_bids = bids.iloc[ (sample_size-1) : ]
+    sample_asks = asks.iloc[ (sample_size-1) : ]
     
     same_day_mask = np.apply_along_axis(is_same_day, axis=1, arr=samples[:, :, time_idx])
     non_time_mask = np.arange(samples.shape[-1]) != time_idx
     samples = samples[same_day_mask, :, :][:, :, non_time_mask]  # Filter for data from the same day, and exclude the time column
     sample_labels = sample_labels[same_day_mask]                 # Labels corresponding to `samples`
+    sample_bids = sample_bids[same_day_mask]
+    sample_asks = sample_asks[same_day_mask]
     
-    return samples.copy().astype('float32'), sample_labels.copy()
+    return samples.copy().astype('float32'), sample_labels.copy(), sample_bids.copy(), sample_asks.copy()
 
 
 #####
