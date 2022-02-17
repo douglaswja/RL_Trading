@@ -2,4 +2,5 @@
 *pycache*
 mlruns/*
 datasets/*
+__pycache__/*
 

@@ -107,6 +107,51 @@ def get_base_features(message, orderbook, weights = [0.7, 0.2, 0.05, 0.03, 0.02]
     return data.reset_index(drop=True)
 
 
+
+# minimal_data = minimal_data.drop(['mid_price_2', 'mid_price_3', 'weighted_ask_liquidity', 'weighted_buy_liquidity', 'weighted_ask_volume', 'weighted_buy_volume', 'open', 'high', 'low', 'close'],axis=1)
+def get_minimal_interval_insight_features(base_data, granularity = '250 ms'):
+    base_group = base_data.groupby(base_data.time.dt.round(granularity))
+    
+    # Data for start-of-period
+    interval_data = base_group.first().loc[:, ['bid', 'ask', 'spread', 'mid_price', 'mid_price_2', 'mid_price_3']]
+    
+    # Aggregate data
+    interval_data = interval_data.merge(base_group.agg({
+        'vol': np.sum,
+        'log_return': np.sum,
+        'weighted_ask_liquidity': np.mean,
+        'weighted_buy_liquidity': np.mean,
+        'order_book_imbalance': np.mean,
+        'weighted_ask_volume': np.mean,
+        'weighted_buy_volume': np.mean,
+    }), left_index=True, right_index=True)
+    
+    # Counts
+    interval_data = interval_data.merge(base_group.size().fillna(0).rename('interval_count'), left_index=True, right_index=True)
+    interval_data = interval_data.merge(base_group.direct.value_counts().unstack().rename(columns = {-1: 'interval_sell_count', 1: 'interval_buy_count'}).loc[:, 'interval_buy_count'].fillna(0).rename('interval_buy_count'),
+                        left_index=True,
+                        right_index=True)
+    # OHLC, STD
+    interval_data = interval_data.merge(base_group.mid_price.agg([
+            lambda x: x.iloc[0],   # Open
+            np.max,                # High
+            np.min,                # Low
+            lambda x: x.iloc[-1],  # Close
+            np.std,                # Std
+        ]).rename({'<lambda_0>': 'open', 'amax': 'high', 'amin': 'low', '<lambda_1>': 'close', 'std': 'mid_price_std'}, axis=1).fillna(0), left_index=True, right_index=True)
+    
+    # Volume Weighted Average Price
+    vwap = ((base_data.price * base_data.vol).groupby(base_data.time.dt.round(granularity)).sum() / base_data.vol.groupby(base_data.time.dt.round(granularity)).sum()).rename('vwap')
+    interval_data = interval_data.merge(vwap, left_index=True, right_index=True)
+    
+    # Flow Quantity
+    flow_qty = base_data.vol.groupby([base_data.time.dt.round(granularity), base_data.direct]).sum().unstack().fillna(1).apply(np.log).loc[:, [-1, 1]].diff(axis=1).loc[:, 1].rename('flow_qty')
+    interval_data = interval_data.merge(flow_qty, left_index=True, right_index=True)
+    
+    return interval_data
+    
+
+
 def get_interval_insight_features(base_data, granularity = '250 ms'):
     base_group = base_data.groupby(base_data.time.dt.round(granularity))
     
