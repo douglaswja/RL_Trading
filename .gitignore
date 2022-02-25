@@ -3,6 +3,7 @@
 **/data
 **/datasets
 **/.ipynb_checkpoints
+*.egg-info
 
 *.pt
 
