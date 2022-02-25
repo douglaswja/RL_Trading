@@ -1,6 +1,8 @@
-*.ipynb_checkpoints*
-*pycache*
-mlruns/*
-datasets/*
-__pycache__/*
+**/__pycache__
+**/mlruns
+**/data
+**/datasets
+**/.ipynb_checkpoints
+
+*.pt
 
