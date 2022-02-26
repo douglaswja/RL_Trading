@@ -17,18 +17,18 @@ class BaseEnvironment:
         self.curr_step = None
     
     def step(self, action: int):
-        if curr_step is None:
+        if self.curr_step is None:
             raise LookupError("Environment must be reset before it can step forward")
         
-        curr_state = self.data[self.curr_step, ...].copy()
+        curr_state = self.data[self.curr_step, ...].clone()
         self.curr_step += 1
         
         # next_state
-        raw_next_state = self.data[self.curr_step, ...].copy()
-        next_state = raw_next_state[..., action_idx] = action
+        next_state = self.data[self.curr_step, ...].clone()
+        next_state[..., self.action_idx] = action
         
         # reward
-        reward = get_reward(
+        reward = BaseEnvironment.get_reward(
             prev_state = curr_state, prev_bid = self.bids[self.curr_step - 1], prev_ask = self.asks[self.curr_step - 1],
             curr_state = next_state, curr_bid = self.bids[self.curr_step], curr_ask = self.asks[self.curr_step],
             use_midprice = self.use_midprice,

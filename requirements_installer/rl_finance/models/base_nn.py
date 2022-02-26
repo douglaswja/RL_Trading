@@ -20,4 +20,4 @@ class BaseNN(nn.Module):
         self.load_state_dict(torch.load(path))
     
     def init_weights(self):
-        self.apply(_linear_weight_init)
+        self.apply(BaseNN._linear_weight_init)

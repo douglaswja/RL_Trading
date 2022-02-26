@@ -6,15 +6,18 @@ from rl_finance.models.base_nn import BaseNN
 
 """Policy Function := P(a | s)"""
 class PolicyNetwork(BaseNN):
-    def __init__(self, input_dim, output_dim):
-        super().__init__()
+        
+    def __init__(self, input_dim, output_dim, encoder_nn=None, **kwargs):
+        super().__init__(**kwargs)
+        
         self.linear_stack = nn.Sequential(
-            nn.Linear(input_dim, 32),
+            encoder_nn if encoder_nn else nn.Identity(),
+            nn.Linear(input_dim, 16),
             nn.ReLU(),
-            nn.Linear(32, 16),
+            nn.Linear(16, 8),
             nn.Dropout(0.5),
             nn.ReLU(),
-            nn.Linear(16, output_dim),
+            nn.Linear(8, output_dim),
         )
         self.init_weights()
         
