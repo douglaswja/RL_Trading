@@ -29,6 +29,9 @@ class DQN_Agent(BaseAgent):
         loss.backward()
         self.optimizer.step()
         return loss.item()
+    
+    def update_target(self):
+        self.target_model.load_state_dict(self.model.state_dict())
         
     def get_exploration_action(self):
         action = torch.tensor(random.sample(self.action_space, 1)[0]).long().to(self.device)
