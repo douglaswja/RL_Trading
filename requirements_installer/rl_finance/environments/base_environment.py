@@ -19,6 +19,8 @@ class BaseEnvironment:
     def step(self, action: int):
         if self.curr_step is None:
             raise LookupError("Environment must be reset before it can step forward")
+        if action not in self.action_space:
+            raise ValueError(f"The given action is not in the valid action space: {self.action_space}")
         
         curr_state = self.data[self.curr_step, ...].clone()
         self.curr_step += 1
@@ -49,6 +51,12 @@ class BaseEnvironment:
     
     def close(self):
         self.curr_step = None
+    
+    def get_n_observation_space(self):
+        return self.observation_space
+    
+    def get_n_action_space(self):
+        return len(self.action_space)
     
     
     @staticmethod
