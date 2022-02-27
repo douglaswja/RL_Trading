@@ -22,13 +22,9 @@ class BaseAgent(ABC):
         self.discount_rate = discount_rate
         self.target_update_interval = target_update_interval
         
-        self.train_reward_history = []
-        self.validation_reward_history = []
-        self.test_reward_history = []
-        
         self.epoch = 0
     
-    def _deploy(self, env, can_explore=True, can_learn=True):
+    def _deploy(self, env, can_explore, can_learn):
         log = {
             'step_count': 1,
             'episode_reward': 0,
@@ -45,7 +41,10 @@ class BaseAgent(ABC):
                 action = self.get_exploitation_action(state)
             
             next_state, reward, done = env.step(action.item())
-            self.replay_memory.push(Experience(state, action, reward, next_state, done))
+            
+            if can_learn:
+                # Do not save Experiences that we are not allowed to learn from, e.g. validation / test runs
+                self.replay_memory.push(Experience(state, action, reward, next_state, done))
             
             log['step_count'] += 1
             log['episode_reward'] += reward
